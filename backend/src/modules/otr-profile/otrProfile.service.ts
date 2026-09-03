@@ -4,7 +4,7 @@ import { users, profiles, addresses, education } from '../../db/schema';
 import { AppError } from '../../middleware/errorHandler';
 import { CanonicalProfile } from '../../types/canonical';
 import { UpdateProfileInput } from './otrProfile.validation';
-import { logger } from '../../utils/logger';
+import { recordAuditEvent } from '../audit/audit.service';
 
 async function loadCanonicalProfile(userId: string): Promise<CanonicalProfile> {
   const profileRow = await db.query.profiles.findFirst({
@@ -107,7 +107,7 @@ export async function updateProfileForUser(
     }
   });
 
-  logger.info('AUDIT', { event: 'PROFILE_UPDATED', userId, result: 'SUCCESS' });
+  await recordAuditEvent({ event: 'PROFILE_UPDATED', userId, result: 'SUCCESS' });
 
   return loadCanonicalProfile(userId);
 }

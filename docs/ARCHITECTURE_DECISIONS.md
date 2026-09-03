@@ -115,3 +115,50 @@ modules"), the foundation stops at:
 - **No credential verification simulation** — the `credentials` table
   exists with the right shape and status enum, but no mock-issuer logic.
   That's Anchal's module.
+
+---
+
+## 7. Audit-log persistence + `GET /api/audit-logs` (core/integration, post-handoff)
+
+**Context:** by the time Harsh/Adi/Anchal had branched off the foundation
+(`feature/harsh-connectors`, `feature/adi-frontend`,
+`feature/anchal-consent-data`), the `audit_logs` table existed in the
+schema (§18) but nothing ever wrote to it — `auth.service.ts` and
+`otrProfile.service.ts` only `console.log`'d an `"AUDIT"` line. There was
+also no way to *read* audit history, which Adi's dashboard needs (§20)
+and which Anchal (`CONSENT_*`) and Harsh (`DATA_ACCESSED`) will need to
+write into per §24.
+
+**Decision:** added this as shared core/integration infrastructure, not
+as any one developer's module work:
+
+- `src/modules/audit/auditEvents.ts` — closed vocabulary of event names
+  (`AUDIT_EVENTS`) so nobody invents ad-hoc strings.
+- `src/modules/audit/audit.service.ts` — `recordAuditEvent()` (write) and
+  `listAuditEventsForUser()` (scoped read, own-user-only).
+- `GET /api/audit-logs` — auth-required, returns only the caller's own
+  history, most recent first, `limit` query param (1–200, default 50).
+- Rewired the two existing `console.log('AUDIT', ...)` call sites in
+  `auth.service.ts` and `otrProfile.service.ts` to actually persist via
+  `recordAuditEvent()` (console output kept alongside, for dev visibility).
+
+**Why this is foundation-owned, not a module's work:** it's cross-cutting
+(every module needs to write to it), doesn't implement any module's
+business logic (no consent decisions, no connector/mapping logic, no UI),
+and unblocks a concrete requirement each of the other three already has
+in their own instructions.
+
+**Deliberately NOT done here:** an admin-facing "all users' audit events"
+view (§25 — admin role is out of scope for the foundation), and nobody
+else's actual event-emitting calls (Anchal/Harsh still need to call
+`recordAuditEvent` from their own modules when they implement
+`CONSENT_GRANTED`, `DATA_ACCESSED`, etc. — this just gives them a shared,
+tested place to call into).
+
+**Verification performed:** `npm run build` (clean), `npm test` (17/17
+passing, including 5 new tests: persistence, retrieval, `LOGIN FAILURE`
+with no `userId`, cross-user isolation, `limit` validation), plus a
+manual live run (`tsx src/index.ts` against a real Postgres instance) —
+registered a user, confirmed the `PROFILE_UPDATED` row via direct SQL
+query, and confirmed `GET /api/audit-logs` returns it. See
+`docs/API_CONTRACTS.md` for the endpoint contract.

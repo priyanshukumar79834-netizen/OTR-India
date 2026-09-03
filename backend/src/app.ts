@@ -6,6 +6,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { healthRouter } from './modules/health/health.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { otrProfileRouter } from './modules/otr-profile/otrProfile.routes';
+import { auditRouter } from './modules/audit/audit.routes';
 
 export function createApp() {
   const app = express();
@@ -18,6 +19,7 @@ export function createApp() {
   app.use('/api/health', healthRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/otr/profile', otrProfileRouter);
+  app.use('/api/audit-logs', auditRouter);
 
   // --- Reserved mount points for the other three modules ---
   // Harsh:  app.use('/api/interop', interopRouter)     — government portal connectors
@@ -26,6 +28,11 @@ export function createApp() {
   //         app.use('/api/applications', applicationsRouter)
   // Mount them here once each module lands, rather than inventing a
   // separate Express app per module.
+  //
+  // Anchal/Harsh: to emit an audit event from your own module, import
+  // `recordAuditEvent` from `src/modules/audit/audit.service.ts` and use
+  // one of the constants in `src/modules/audit/auditEvents.ts` — don't
+  // invent a new event string or write to `audit_logs` directly.
 
   app.use(notFoundHandler);
   app.use(errorHandler);
